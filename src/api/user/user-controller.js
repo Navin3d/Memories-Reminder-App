@@ -31,20 +31,6 @@ const signUpWithOTP = async (req, res) => {
             },
             { upsert: true }
         );
-        if (matchedCount != 0) {
-            var foundUser = await User.findOne({ email });
-            if (foundUser["is_loggedin"] == false)
-                if (foundUser["otp_count"])
-                    foundUser["otp_count"] = foundUser["otp_count"] + 1;
-                else
-                    foundUser["otp_count"] = 1;
-            if (foundUser["otp_count"] > 5)
-                return res.status(500).json({
-                    message: "Max OTP count exeeded...",
-                    status: 1,
-                });
-            foundUser.save();
-        }
         return res.status(200).json({
             message: "Sent Opt!",
             status: 1,
@@ -114,6 +100,12 @@ const loginUserWithOTP = async (req, res) => {
                 message: "Enter an valid email address...",
                 status: 0,
             });
+        var foundUserOne = await User.findOne({ email });
+        if (foundUserOne["otp_count"] > 5)
+            return res.status(400).json({
+                message: "Max OTP count exeeded...",
+                status: 0,
+            });
         const { matchedCount } = await User.updateOne(
             {
                 email,
@@ -128,18 +120,23 @@ const loginUserWithOTP = async (req, res) => {
                 }
             },
         );
-        const foundUser = await User.findOne({ email });
-        if (matchedCount == 0)
-            return res.status(403).json({
+        if (matchedCount == 0) {
+            if (foundUserOne["otp_count"])
+                foundUserOne["otp_count"] = foundUserOne["otp_count"] + 1;
+            else
+                foundUserOne["otp_count"] = 1;
+            foundUserOne.save();
+            return res.status(400).json({
                 message: "OTP and email does not match...",
                 status: 0,
                 error: "Invalid otp or email id."
             });
+        }
         return res.status(200).json({
             message: "Logged in...!",
             status: 1,
             jwt: authorizationService.generateJWToken(email),
-            isNewUser: foundUser["name"] ? false : true,
+            isNewUser: foundUserOne["name"] ? false : true,
         });
     } catch (e) {
         console.log(e);
